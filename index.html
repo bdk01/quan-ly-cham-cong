@@ -1265,6 +1265,45 @@
       localStorage.setItem(DRIVE_BASE_KEY, JSON.stringify({ id: file.id, version: file.version, snapshot }));
     }
 
+    function mergeDriveSnapshots(base, local, cloud) {
+      const before = JSON.parse(base);
+      const onDevice = JSON.parse(local);
+      const onDrive = JSON.parse(cloud);
+      const byId = snapshot => new Map(snapshot.records.map(record => [record.id, record]));
+      const original = byId(before);
+      const device = byId(onDevice);
+      const remote = byId(onDrive);
+      if (original.size !== before.records.length || device.size !== onDevice.records.length ||
+          remote.size !== onDrive.records.length) return null;
+      const ids = new Set([...remote.keys(), ...device.keys()]);
+      const sameRecord = (a, b) => a === b || Boolean(a && b &&
+        ['date', 'mode', 'startTime', 'endTime', 'hours', 'rate', 'note'].every(field => a[field] === b[field]));
+
+      const combined = [];
+      for (const id of ids) {
+        const prior = original.get(id);
+        const localRecord = device.get(id);
+        const cloudRecord = remote.get(id);
+        const localEdited = !sameRecord(prior, localRecord);
+        const cloudEdited = !sameRecord(prior, cloudRecord);
+        if (localEdited && cloudEdited && !sameRecord(localRecord, cloudRecord)) return null;
+        const record = localEdited ? localRecord : cloudRecord;
+        if (record) combined.push(record);
+      }
+      const rate = onDevice.defaultRate === before.defaultRate ? onDrive.defaultRate : onDevice.defaultRate;
+      return JSON.stringify({ defaultRate: rate, records: combined });
+    }
+
+    function applyDriveSnapshot(snapshot, resetForm) {
+      const rateInput = document.getElementById('hourlyRateInput');
+      const useSyncedRate = Number(rateInput.value) === defaultRate;
+      ({ records, defaultRate } = JSON.parse(snapshot));
+      saveLocalData(false);
+      if (resetForm) resetFormToAddMode();
+      else if (useSyncedRate) rateInput.value = defaultRate;
+      refreshAllViews();
+    }
+
     async function syncDrive(action = 'auto') {
       if (!driveSession || driveConnecting) return;
       if (action === 'refresh' && document.getElementById('editingRecordId').value) return;
@@ -1287,8 +1326,11 @@
         const base = loadDriveBase();
         const isSameFile = Boolean(file && base?.id === file.id);
         const localChanged = base ? base.snapshot !== local : records.length > 0 || defaultRate !== 40000;
-        const cloudChanged = Boolean(file && (!isSameFile || base.version !== file.version));
+        const cloudChanged = Boolean(file && (!isSameFile || base.snapshot !== file.snapshot));
         const differentBackup = Boolean(file && base && !isSameFile);
+        const editing = Boolean(document.getElementById('editingRecordId').value);
+        const merged = isSameFile && localChanged && cloudChanged && local !== file.snapshot && !editing
+          ? mergeDriveSnapshots(base.snapshot, local, file.snapshot) : null;
 
         const hasLocalData = records.length > 0 || defaultRate !== 40000;
         if (file) setDriveFirstSaveReady(false);
@@ -1304,24 +1346,30 @@
           message = driveSession.readyForFirstSave
             ? 'Đã kết nối Drive. Ca đầu tiên sẽ tự lưu lên Drive.'
             : 'Chưa có dữ liệu trên Drive. Bấm Lưu lên Drive để tạo bản đầu tiên.';
-        } else if (file && action === 'pull' && local !== file.snapshot && (localChanged || differentBackup) &&
+        } else if (file && action === 'pull' && !merged && (!isSameFile || cloudChanged) &&
+            local !== file.snapshot && (localChanged || differentBackup) &&
             !window.confirm('Tải bản Drive sẽ thay thế dữ liệu đang có trên trình duyệt này. Bạn đã sao lưu JSON và muốn tiếp tục?')) {
           message = 'Đã giữ dữ liệu trên máy. Bạn có thể xuất JSON trước khi tải lại từ Drive.';
-        } else if (file && (local === file.snapshot || action === 'pull' || (cloudChanged && !localChanged && !differentBackup && !document.getElementById('editingRecordId').value))) {
-          if (local !== file.snapshot) {
-            const rateInput = document.getElementById('hourlyRateInput');
-            const useSyncedRate = Number(rateInput.value) === defaultRate;
-            ({ records, defaultRate } = JSON.parse(file.snapshot));
-            saveLocalData(false);
-            if (action === 'pull') resetFormToAddMode();
-            else if (useSyncedRate) rateInput.value = defaultRate;
-            refreshAllViews();
-          }
+        } else if (file && (local === file.snapshot || (action === 'pull' && !merged && (!isSameFile || cloudChanged)) ||
+            (cloudChanged && !localChanged && !differentBackup && !editing))) {
+          if (local !== file.snapshot) applyDriveSnapshot(file.snapshot, action === 'pull');
           rememberDriveBackup(file, file.snapshot);
           message = `Đã tải dữ liệu từ Drive (${records.length} ca).`;
           tone = 'synced';
+        } else if (merged) {
+          // Save the new base before uploading so edits made during the request stay local and can retry.
+          if (local !== merged) applyDriveSnapshot(merged, false);
+          rememberDriveBackup(file, file.snapshot);
+          if (merged !== file.snapshot) {
+            const saved = await writeDriveBackup(file, merged);
+            rememberDriveBackup(saved, merged);
+          }
+          message = 'Đã gộp và đồng bộ các thay đổi trên máy và Drive.';
+          tone = 'synced';
         } else if (file && cloudChanged) {
-          message = 'Dữ liệu trên máy và Drive khác nhau. Xuất JSON trên máy, rồi tải bản Drive và nhập gộp nếu cần.';
+          message = isSameFile && !editing
+            ? 'Cùng một ca đã thay đổi trên máy và Drive. Xuất JSON trước khi chọn bản muốn giữ.'
+            : 'Bản trên máy và Drive chưa có bản đồng bộ chung, hoặc bạn đang sửa ca. Kiểm tra trước khi tải bản Drive.';
           tone = 'error';
         } else if (canCreate && (action === 'connect' || (action === 'push' && base && !driveSession.readyForFirstSave)) &&
             !window.confirm('Google Drive chưa có bản chấm công. Bạn muốn lưu dữ liệu trên máy lên Drive?')) {
