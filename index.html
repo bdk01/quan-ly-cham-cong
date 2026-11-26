@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản lý Chấm công & Tính lương</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Be Vietnam Pro', sans-serif; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Header & Realtime Clock -->
+  <header class="bg-gradient-to-r from-teal-700 via-teal-600 to-sky-700 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white/15 backdrop-blur-sm">
+            <svg class="w-5 h-5 text-teal-100" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"/>
+            </svg>
+          </span>
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight">Quản lý Chấm công &amp; Tính lương</h1>
+        </div>
+        <p class="text-teal-100 text-xs sm:text-sm mt-1">Theo dõi ca làm việc theo thời gian thực, lịch tháng trực quan &amp; đồng bộ Google Drive</p>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-teal-100 font-medium">Thời gian thực</div>
+          <div class="flex items-baseline gap-2.5">
+            <span id="rtDate" class="text-sm sm:text-base font-semibold tabular-nums">--/--/----</span>
+            <span class="text-teal-200">|</span>
+            <span id="rtTime" class="text-base sm:text-lg font-bold text-amber-200 tabular-nums">--:--:--</span>
+          </div>
+        </div>
+        <button id="btnPickToday" type="button"
+          class="ml-1 px-3 py-1.5 rounded-lg bg-white text-teal-800 hover:bg-teal-50 text-xs font-semibold shadow-sm transition cursor-pointer">
+          Chọn hôm nay
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Google Drive Cloud Sync Bar -->
+  <section class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm">
+        <span id="syncStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+        <span id="syncStatusText" class="font-medium text-slate-700">Đang lưu cục bộ trên trình duyệt (Chưa kết nối Google Drive)</span>
+        <span id="lastBackupBadge" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600">
+          Chưa sao lưu JSON
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btnOpenDriveConfig" type="button"
+          class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5 text-rose-500" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          Cấu hình Drive
+        </button>
+        <button id="btnDriveConnect" type="button"
+          class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
+          Kết nối Google Drive
+        </button>
+        <button id="btnDriveSyncNow" type="button"
+          class="hidden px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
+          Lưu lên Drive
+        </button>
+        <button id="btnDrivePullNow" type="button"
+          class="hidden px-3 py-1.5 rounded-lg border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition cursor-pointer">
+          Tải từ Drive
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsible Google Drive OAuth Client ID Config Panel -->
+    <div id="driveConfigPanel" class="hidden bg-slate-50 border-t border-slate-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div class="flex-1">
+          <label for="googleClientIdInput" class="block text-xs font-semibold text-slate-700 mb-1">
+            Google OAuth 2.0 Client ID (Scope: <code class="text-sky-700">drive.appdata</code>)
+          </label>
+          <input id="googleClientIdInput" type="text" placeholder="Ví dụ: 1234567890-abcdefg.apps.googleusercontent.com"
+            class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500" />
+        </div>
+        <div class="flex items-center gap-2 self-end">
+          <button id="btnSaveClientId" type="button"
+            class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold cursor-pointer">
+            Lưu Client ID
+          </button>
+          <button id="btnCloseDriveConfig" type="button"
+            class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 text-xs font-medium cursor-pointer">
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Top KPI Summary Cards (Synced with Selected Month Filter) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Kỳ thống kê đang xem</div>
+        <div id="kpiMonthLabel" class="text-xl font-bold text-slate-800 mt-1">Tháng --/----</div>
+        <div class="text-xs text-teal-600 mt-1 font-medium">Tự động cộng dồn theo bộ lọc</div>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Tổng số ngày làm việc</div>
+        <div class="flex items-baseline gap-1.5 mt-1">
+          <span id="kpiWorkDays" class="text-2xl font-bold text-teal-700 tabular-nums">0</span>
+          <span class="text-xs text-slate-500 font-medium">ngày (có tick ✓)</span>
+        </div>
+        <div id="kpiShiftCount" class="text-xs text-slate-500 mt-1">Tổng cộng 0 ca làm việc</div>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Tổng giờ làm trong kỳ</div>
+        <div class="flex items-baseline gap-1.5 mt-1">
+          <span id="kpiTotalHours" class="text-2xl font-bold text-sky-700 tabular-nums">0.0</span>
+          <span class="text-xs text-slate-500 font-medium">giờ</span>
+        </div>
+        <div class="text-xs text-slate-500 mt-1">Hỗ trợ tự động tính ca qua đêm</div>
+      </div>
+      <div class="bg-gradient-to-br from-teal-600 to-sky-700 rounded-xl p-4 shadow-sm text-white">
+        <div class="text-xs font-medium text-teal-100 uppercase tracking-wider">Tổng lương trong kỳ</div>
+        <div id="kpiTotalSalary" class="text-2xl font-bold mt-1 tabular-nums">0 đ</div>
+        <div id="kpiRateHint" class="text-xs text-teal-100 mt-1">Đơn giá mặc định: 40.000 đ/h</div>
+      </div>
+    </div>
+
+    <!-- Middle Section: Left Form + Right Interactive Calendar -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- Left Column: Shift Entry Form (5 cols) -->
+      <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 id="formTitle" class="text-base font-bold text-slate-800">Chấm công ngày làm việc</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Chọn ngày trên lịch hoặc nhập định dạng dd/mm/yyyy</p>
+          </div>
+          <span id="editBadge" class="hidden px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+            Đang sửa ca
+          </span>
+        </div>
+
+        <form id="attendanceForm" class="p-5 space-y-4">
+          <input type="hidden" id="editingRecordId" value="" />
+
+          <!-- Date Input (dd/mm/yyyy) -->
+          <div>
+            <label for="workDateInput" class="block text-xs font-semibold text-slate-700 mb-1.5">
+              Ngày làm việc (<span class="text-teal-700">dd/mm/yyyy</span>)
+            </label>
+            <div class="flex gap-2">
+              <input id="workDateInput" type="text" placeholder="dd/mm/yyyy" maxlength="10" required
+                class="flex-1 px-3.5 py-2 text-sm font-semibold tabular-nums border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500" />
+              <button id="btnFormToday" type="button"
+                class="px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold transition cursor-pointer">
+                Hôm nay
+              </button>
+            </div>
+            <p id="dateWeekdayHint" class="text-xs text-slate-500 mt-1">Click trực tiếp vào ngày bất kỳ trên lịch bên cạnh để chọn nhanh.</p>
+          </div>
+
+          <!-- 3 Shift Modes -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Chọn khung giờ làm việc</label>
+            <div class="grid grid-cols-1 gap-2">
+              <!-- Option 1: 20:00 - 01:00 -->
+              <label class="shift-radio-card relative flex items-center justify-between p-3 rounded-xl border-2 border-teal-600 bg-teal-50/60 cursor-pointer transition">
+                <div class="flex items-center gap-2.5">
+                  <input type="radio" name="shiftMode" value="20:00-01:00" checked class="w-4 h-4 text-teal-600 focus:ring-teal-500" />
+                  <div>
+                    <div class="text-sm font-bold text-slate-800">Ca cố định 1: <span class="text-teal-700 tabular-nums">20:00 - 01:00</span></div>
+                    <div class="text-xs text-slate-500">Ca tối qua đêm • Cố định 5.0 giờ</div>
+                  </div>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg bg-teal-600 text-white text-xs font-bold tabular-nums">5.0h</span>
+              </label>
+
+              <!-- Option 2: 19:00 - 01:00 -->
+              <label class="shift-radio-card relative flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-teal-300 bg-white cursor-pointer transition">
+                <div class="flex items-center gap-2.5">
+                  <input type="radio" name="shiftMode" value="19:00-01:00" class="w-4 h-4 text-teal-600 focus:ring-teal-500" />
+                  <div>
+                    <div class="text-sm font-bold text-slate-800">Ca cố định 2: <span class="text-sky-700 tabular-nums">19:00 - 01:00</span></div>
+                    <div class="text-xs text-slate-500">Ca tối tăng cường qua đêm • Cố định 6.0 giờ</div>
+                  </div>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 text-xs font-bold tabular-nums">6.0h</span>
+              </label>
+
+              <!-- Option 3: Custom hh:mm -->
+              <label class="shift-radio-card relative flex items-center justify-between p-3 rounded-xl border border-slate-200 hover:border-teal-300 bg-white cursor-pointer transition">
+                <div class="flex items-center gap-2.5">
+                  <input type="radio" name="shiftMode" value="custom" class="w-4 h-4 text-teal-600 focus:ring-teal-500" />
+                  <div>
+                    <div class="text-sm font-bold text-slate-800">Khung giờ tự chọn (<span class="text-indigo-700">hh:mm</span>)</div>
+                    <div class="text-xs text-slate-500">Tự nhập giờ vào &amp; giờ ra linh hoạt</div>
+                  </div>
+                </div>
+                <span class="px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-800 text-xs font-bold">Tùy chỉnh</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Custom Time Inputs (hh:mm) -->
+          <div id="customTimeBox" class="hidden p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-2.5">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="customStartInput" class="block text-xs font-semibold text-indigo-900 mb-1">Giờ vào (hh:mm)</label>
+                <input id="customStartInput" type="text" value="18:00" placeholder="hh:mm" maxlength="5"
+                  class="w-full px-3 py-1.5 text-sm font-semibold tabular-nums border border-indigo-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label for="customEndInput" class="block text-xs font-semibold text-indigo-900 mb-1">Giờ ra (hh:mm)</label>
+                <input id="customEndInput" type="text" value="22:30" placeholder="hh:mm" maxlength="5"
+                  class="w-full px-3 py-1.5 text-sm font-semibold tabular-nums border border-indigo-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+            <p class="text-[11px] text-indigo-700">Mẹo: Nếu giờ ra nhỏ hơn giờ vào (ví dụ 20:00 → 01:30), hệ thống tự tính là ca qua đêm.</p>
+          </div>
+
+          <!-- Hourly Rate & Note -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="hourlyRateInput" class="block text-xs font-semibold text-slate-700 mb-1">Đơn giá (VNĐ/giờ)</label>
+              <input id="hourlyRateInput" type="number" step="1000" min="0" value="40000" required
+                class="w-full px-3 py-2 text-sm font-semibold tabular-nums border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            </div>
+            <div>
+              <label for="noteInput" class="block text-xs font-semibold text-slate-700 mb-1">Ghi chú (tùy chọn)</label>
+              <input id="noteInput" type="text" placeholder="VD: Tăng ca cuối tuần..."
+                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            </div>
+          </div>
+
+          <!-- Live Calculation Preview Box -->
+          <div class="p-3.5 rounded-xl bg-slate-900 text-white flex items-center justify-between">
+            <div>
+              <div class="text-[11px] text-slate-400 uppercase tracking-wider">Tạm tính ca này</div>
+              <div class="text-sm font-semibold text-teal-300 mt-0.5 tabular-nums">
+                <span id="previewTimeRange">20:00 - 01:00</span> • <span id="previewHours">5.0</span> giờ
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-[11px] text-slate-400">Thành tiền</div>
+              <div id="previewSalary" class="text-lg font-bold text-amber-300 tabular-nums">200.000 đ</div>
+            </div>
+          </div>
+
+          <!-- Submit & Cancel Edit Buttons -->
+          <div class="flex items-center gap-2.5 pt-1">
+            <button id="btnSubmitShift" type="submit"
+              class="flex-1 py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-sm transition cursor-pointer flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+              </svg>
+              <span id="btnSubmitLabel">Lưu ngày làm việc</span>
+            </button>
+            <button id="btnCancelEdit" type="button"
+              class="hidden py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-sm transition cursor-pointer">
+              Hủy
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Right Column: Interactive Calendar with Green Checkmarks (7 cols) -->
+      <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Lịch tháng chấm công</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Các ngày đã làm việc được đánh dấu tick xanh (<span class="text-emerald-600 font-bold">✓</span>)</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btnPrevMonth" type="button" title="Tháng trước"
+              class="p-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <div id="calendarMonthTitle" class="min-w-[140px] text-center text-sm font-bold text-slate-800">
+              Tháng -- / ----
+            </div>
+            <button id="btnNextMonth" type="button" title="Tháng sau"
+              class="p-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="p-4 sm:p-5">
+          <div class="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-slate-500 mb-2">
+            <div class="py-1">Thứ 2</div>
+            <div class="py-1">Thứ 3</div>
+            <div class="py-1">Thứ 4</div>
+            <div class="py-1">Thứ 5</div>
+            <div class="py-1">Thứ 6</div>
+            <div class="py-1 text-sky-600">Thứ 7</div>
+            <div class="py-1 text-rose-600">Chủ nhật</div>
+          </div>
+          <div id="calendarGrid" class="grid grid-cols-7 gap-1.5 sm:gap-2"></div>
+
+          <!-- Legend -->
+          <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+            <div class="flex flex-wrap items-center gap-4">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] font-bold">✓</span>
+                Đã chấm công
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-4 h-4 rounded border-2 border-teal-600 bg-teal-50 inline-block"></span>
+                Ngày đang chọn
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-4 h-4 rounded bg-amber-100 border border-amber-300 inline-block"></span>
+                Hôm nay
+              </span>
+            </div>
+            <div id="selectedDaySummary" class="font-medium text-teal-700"></div>
+          </div>
+
+          <!-- Quick Shifts List for Selected Day -->
+          <div id="selectedDayShiftsPanel" class="mt-3 hidden p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200">
+            <div class="flex items-center justify-between mb-2">
+              <span id="selectedDayPanelTitle" class="text-xs font-bold text-emerald-900">Chi tiết ca làm ngày --/--/----</span>
+              <span id="selectedDayPanelTotal" class="text-xs font-bold text-emerald-700 tabular-nums"></span>
+            </div>
+            <div id="selectedDayShiftsList" class="space-y-1.5"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Section: Detailed Work Log Table + Monthly TOTAL Row -->
+    <section class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 bg-slate-50/80 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-slate-800">Bảng kê chi tiết ngày làm việc &amp; Tính lương</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Hiển thị đầy đủ từng ca làm kèm hàng <strong class="text-teal-700">TOTAL THÁNG</strong> tự động tổng hợp cuối bảng</p>
+        </div>
+
+        <!-- Filter & Data Tools -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5">
+            <label for="monthFilterSelect" class="text-xs font-semibold text-slate-600">Lọc tháng:</label>
+            <select id="monthFilterSelect" class="text-xs font-bold text-teal-700 bg-transparent focus:outline-none cursor-pointer"></select>
+          </div>
+
+          <button id="btnExportCsv" type="button"
+            class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
+            Xuất Excel (CSV)
+          </button>
+
+          <button id="btnExportJson" type="button"
+            class="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition cursor-pointer">
+            Xuất Backup JSON
+          </button>
+
+          <label class="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition cursor-pointer">
+            Nhập JSON
+            <input id="inputImportJson" type="file" accept=".json" class="hidden" />
+          </label>
+
+          <button id="btnSeedSample" type="button"
+            class="px-3 py-1.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-semibold transition cursor-pointer">
+            Nạp dữ liệu mẫu
+          </button>
+
+          <button id="btnClearAll" type="button"
+            class="px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition cursor-pointer">
+            Xóa tất cả
+          </button>
+        </div>
+      </div>
+
+      <!-- Responsive Table -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-100/90 border-b border-slate-200 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-600">
+              <th class="py-3.5 px-4 w-14 text-center">STT</th>
+              <th class="py-3.5 px-4">Ngày làm (dd/mm/yyyy)</th>
+              <th class="py-3.5 px-4">Khung giờ / Loại ca</th>
+              <th class="py-3.5 px-4">Ghi chú</th>
+              <th class="py-3.5 px-4 text-right">Số giờ</th>
+              <th class="py-3.5 px-4 text-right">Đơn giá</th>
+              <th class="py-3.5 px-4 text-right">Thành tiền</th>
+              <th class="py-3.5 px-4 text-center w-28">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+          <tfoot id="recordsTableFoot"></tfoot>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JSON Import Mode Modal -->
+  <div id="importModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl border border-slate-200 space-y-4">
+      <h3 class="text-base font-bold text-slate-800">Khôi phục dữ liệu từ file JSON</h3>
+      <p id="importModalDesc" class="text-xs text-slate-600 leading-relaxed">
+        Tìm thấy bản ghi hợp lệ. Bạn muốn gộp thêm vào dữ liệu hiện tại hay thay thế toàn bộ?
+      </p>
+      <div class="flex flex-col sm:flex-row gap-2 pt-1">
+        <button id="btnImportMerge" type="button"
+          class="flex-1 py-2 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold cursor-pointer">
+          Gộp dữ liệu (Lọc trùng)
+        </button>
+        <button id="btnImportReplace" type="button"
+          class="flex-1 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold cursor-pointer">
+          Thay thế toàn bộ
+        </button>
+        <button id="btnImportCancel" type="button"
+          class="py-2 px-3 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer">
+          Hủy
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    // ===================== STATE & CONSTANTS =====================
+    const STORAGE_KEY = 'cham_cong_records_v2';
+    const RATE_KEY = 'cham_cong_default_rate_v2';
+    const BACKUP_META_KEY = 'cham_cong_last_backup_v2';
+    const DRIVE_CLIENT_ID_KEY = 'cham_cong_drive_client_id_v1';
+    const DRIVE_BASE_KEY = 'cham_cong_drive_base_v1';
+    const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+    const DRIVE_FILE_NAME = 'cham-cong.json';
+    const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+    const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
+
+    let records = [];
+    let defaultRate = 40000;
+    let selectedDateStr = ''; // dd/mm/yyyy
+    let viewYear = new Date().getFullYear();
+    let viewMonth = new Date().getMonth() + 1; // 1-12
+    let pendingImportedRecords = [];
+    let pendingImportedRate;
+
+    let driveAccessToken = null;
+    let driveConnecting = false;
+    let driveSyncing = false;
+    let driveSyncQueued = false;
+
+    // ===================== DATE & TIME HELPERS =====================
+    function pad2(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function formatDateDDMMYYYY(dateObj) {
+      return `${pad2(dateObj.getDate())}/${pad2(dateObj.getMonth() + 1)}/${dateObj.getFullYear()}`;
+    }
+
+    function parseDDMMYYYY(str) {
+      if (!str || typeof str !== 'string') return null;
+      const m = str.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!m) return null;
+      const d = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10);
+      const y = parseInt(m[3], 10);
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+      const dt = new Date(y, mo - 1, d);
+      if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+      return dt;
+    }
+
+    function normalizeDDMMYYYY(str) {
+      const dt = parseDDMMYYYY(str);
+      return dt ? formatDateDDMMYYYY(dt) : null;
+    }
+
+    function getWeekdayVi(dt) {
+      const days = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+      return days[dt.getDay()];
+    }
+
+    function parseTimeHHMM(str) {
+      if (!str || typeof str !== 'string') return null;
+      const clean = str.trim().replace('-', ':');
+      const m = clean.match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+      const hh = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+      return { hh, mm, formatted: `${pad2(hh)}:${pad2(mm)}`, minutes: hh * 60 + mm };
+    }
+
+    function calcDurationHours(startStr, endStr) {
+      const s = parseTimeHHMM(startStr);
+      const e = parseTimeHHMM(endStr);
+      if (!s || !e) return null;
+      let diff = e.minutes - s.minutes;
+      if (diff <= 0) diff += 24 * 60; // overnight shift
+      return Math.round((diff / 60) * 100) / 100;
+    }
+
+    function formatCurrency(amount) {
+      return Math.round(amount).toLocaleString('vi-VN') + ' đ';
+    }
+
+    function showToast(msg, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      const colors = {
+        success: 'bg-teal-800 text-white border-teal-600',
+        info: 'bg-sky-800 text-white border-sky-600',
+        warning: 'bg-amber-700 text-white border-amber-500',
+        error: 'bg-rose-700 text-white border-rose-500'
+      };
+      el.className = `pointer-events-auto px-4 py-2.5 rounded-xl border shadow-lg text-xs sm:text-sm font-medium transition-all ${colors[type] || colors.success}`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => el.remove(), 300);
+      }, 3200);
+    }
+
+    // ===================== REALTIME CLOCK =====================
+    function updateRealtimeClock() {
+      const now = new Date();
+      document.getElementById('rtDate').textContent = formatDateDDMMYYYY(now);
+      document.getElementById('rtTime').textContent = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+    }
+
+    // ===================== STORAGE & PERSISTENCE =====================
+    function loadLocalData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        records = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(records)) records = [];
+      } catch {
+        records = [];
+      }
+      const savedRate = Number(localStorage.getItem(RATE_KEY) ?? '40000');
+      defaultRate = Number.isFinite(savedRate) && savedRate >= 0 ? savedRate : 40000;
+      document.getElementById('hourlyRateInput').value = defaultRate;
+
+      const lastBackup = localStorage.getItem(BACKUP_META_KEY);
+      if (lastBackup) {
+        document.getElementById('lastBackupBadge').textContent = `Sao lưu JSON: ${lastBackup}`;
+      }
+
+      const savedClientId = localStorage.getItem(DRIVE_CLIENT_ID_KEY) || '';
+      document.getElementById('googleClientIdInput').value = savedClientId;
+    }
+
+    function saveLocalData(autoSyncCloud = true) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      localStorage.setItem(RATE_KEY, String(defaultRate));
+      if (autoSyncCloud && driveAccessToken) {
+        syncDrive();
+      }
+    }
+
+    // ===================== SHIFT FORM LOGIC =====================
+    function getSelectedShiftDetails() {
+      const mode = document.querySelector('input[name="shiftMode"]:checked').value;
+      if (mode === '20:00-01:00') {
+        return { mode, startTime: '20:00', endTime: '01:00', hours: 5, label: 'Ca cố định 1 (20:00 - 01:00)' };
+      }
+      if (mode === '19:00-01:00') {
+        return { mode, startTime: '19:00', endTime: '01:00', hours: 6, label: 'Ca cố định 2 (19:00 - 01:00)' };
+      }
+      const sRaw = document.getElementById('customStartInput').value;
+      const eRaw = document.getElementById('customEndInput').value;
+      const sParsed = parseTimeHHMM(sRaw);
+      const eParsed = parseTimeHHMM(eRaw);
+      if (!sParsed || !eParsed) return null;
+      const hours = calcDurationHours(sParsed.formatted, eParsed.formatted);
+      return {
+        mode: 'custom',
+        startTime: sParsed.formatted,
+        endTime: eParsed.formatted,
+        hours,
+        label: `Tự chọn (${sParsed.formatted} - ${eParsed.formatted})`
+      };
+    }
+
+    function updateShiftRadioStyles() {
+      document.querySelectorAll('.shift-radio-card').forEach(card => {
+        const radio = card.querySelector('input[type="radio"]');
+        if (radio.checked) {
+          card.classList.remove('border-slate-200', 'bg-white');
+          card.classList.add('border-2', 'border-teal-600', 'bg-teal-50/60');
+        } else {
+          card.classList.remove('border-2', 'border-teal-600', 'bg-teal-50/60');
+          card.classList.add('border', 'border-slate-200', 'bg-white');
+        }
+      });
+
+      const mode = document.querySelector('input[name="shiftMode"]:checked').value;
+      const customBox = document.getElementById('customTimeBox');
+      if (mode === 'custom') {
+        customBox.classList.remove('hidden');
+      } else {
+        customBox.classList.add('hidden');
+      }
+      updateFormPreview();
+    }
+
+    function updateFormPreview() {
+      const rate = Math.max(0, parseFloat(document.getElementById('hourlyRateInput').value) || 0);
+      const shift = getSelectedShiftDetails();
+      if (!shift) {
+        document.getElementById('previewTimeRange').textContent = 'Giờ không hợp lệ (hh:mm)';
+        document.getElementById('previewHours').textContent = '0';
+        document.getElementById('previewSalary').textContent = '0 đ';
+        return;
+      }
+      document.getElementById('previewTimeRange').textContent = `${shift.startTime} - ${shift.endTime}`;
+      document.getElementById('previewHours').textContent = shift.hours.toFixed(1).replace(/\.0$/, '');
+      document.getElementById('previewSalary').textContent = formatCurrency(shift.hours * rate);
+    }
+
+    function setSelectedDate(ddmmyyyy, syncCalendarMonth = true) {
+      const dt = parseDDMMYYYY(ddmmyyyy);
+      if (!dt) return;
+      selectedDateStr = formatDateDDMMYYYY(dt);
+      document.getElementById('workDateInput').value = selectedDateStr;
+      document.getElementById('dateWeekdayHint').textContent = `Đã chọn: ${getWeekdayVi(dt)}, ngày ${selectedDateStr}`;
+
+      if (syncCalendarMonth) {
+        viewYear = dt.getFullYear();
+        viewMonth = dt.getMonth() + 1;
+      }
+      renderCalendar();
+      renderSelectedDayPanel();
+    }
+
+    function resetFormToAddMode() {
+      document.getElementById('editingRecordId').value = '';
+      document.getElementById('formTitle').textContent = 'Chấm công ngày làm việc';
+      document.getElementById('editBadge').classList.add('hidden');
+      document.getElementById('btnSubmitLabel').textContent = 'Lưu ngày làm việc';
+      document.getElementById('btnCancelEdit').classList.add('hidden');
+      document.getElementById('noteInput').value = '';
+      document.getElementById('hourlyRateInput').value = defaultRate;
+      updateFormPreview();
+    }
+
+    function startEditRecord(id) {
+      const rec = records.find(r => r.id === id);
+      if (!rec) return;
+      document.getElementById('editingRecordId').value = rec.id;
+      document.getElementById('formTitle').textContent = 'Cập nhật ca làm việc';
+      document.getElementById('editBadge').classList.remove('hidden');
+      document.getElementById('btnSubmitLabel').textContent = 'Cập nhật ca';
+      document.getElementById('btnCancelEdit').classList.remove('hidden');
+
+      setSelectedDate(rec.date, true);
+      document.getElementById('hourlyRateInput').value = rec.rate;
+      document.getElementById('noteInput').value = rec.note || '';
+
+      if (rec.mode === '20:00-01:00' || (rec.startTime === '20:00' && rec.endTime === '01:00')) {
+        document.querySelector('input[name="shiftMode"][value="20:00-01:00"]').checked = true;
+      } else if (rec.mode === '19:00-01:00' || (rec.startTime === '19:00' && rec.endTime === '01:00')) {
+        document.querySelector('input[name="shiftMode"][value="19:00-01:00"]').checked = true;
+      } else {
+        document.querySelector('input[name="shiftMode"][value="custom"]').checked = true;
+        document.getElementById('customStartInput').value = rec.startTime;
+        document.getElementById('customEndInput').value = rec.endTime;
+      }
+      updateShiftRadioStyles();
+      document.getElementById('attendanceForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function deleteRecord(id) {
+      const idx = records.findIndex(r => r.id === id);
+      if (idx === -1) return;
+      const removed = records[idx];
+      records.splice(idx, 1);
+      if (document.getElementById('editingRecordId').value === id) {
+        resetFormToAddMode();
+      }
+      saveLocalData(true);
+      refreshAllViews();
+      showToast(`Đã xóa ca ${removed.startTime}-${removed.endTime} ngày ${removed.date}`, 'warning');
+    }
+
+    // ===================== CALENDAR RENDERING =====================
+    function renderCalendar() {
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+
+      document.getElementById('calendarMonthTitle').textContent = `Tháng ${pad2(viewMonth)} / ${viewYear}`;
+
+      const firstDay = new Date(viewYear, viewMonth - 1, 1);
+      const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
+      // Monday = 0, ..., Sunday = 6
+      const startWeekday = (firstDay.getDay() + 6) % 7;
+
+      const todayStr = formatDateDDMMYYYY(new Date());
+
+      // Group records by date
+      const mapByDate = {};
+      records.forEach(r => {
+        if (!mapByDate[r.date]) mapByDate[r.date] = [];
+        mapByDate[r.date].push(r);
+      });
+
+      for (let i = 0; i < startWeekday; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'h-16 sm:h-20 rounded-xl bg-slate-50/60 border border-transparent';
+        grid.appendChild(emptyCell);
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${pad2(day)}/${pad2(viewMonth)}/${viewYear}`;
+        const dayRecords = mapByDate[dateStr] || [];
+        const hasWork = dayRecords.length > 0;
+        const isSelected = dateStr === selectedDateStr;
+        const isToday = dateStr === todayStr;
+
+        const totalDayHours = dayRecords.reduce((acc, item) => acc + Number(item.hours || 0), 0);
+
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = [
+          'h-16 sm:h-20 p-1.5 sm:p-2 rounded-xl border text-left flex flex-col justify-between transition cursor-pointer relative',
+          isSelected
+            ? 'border-2 border-teal-600 bg-teal-50/80 shadow-xs'
+            : hasWork
+              ? 'border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50'
+              : isToday
+                ? 'border-amber-300 bg-amber-50/60 hover:bg-amber-50'
+                : 'border-slate-200/80 bg-white hover:border-teal-300 hover:bg-slate-50'
+        ].join(' ');
+
+        cell.addEventListener('click', () => {
+          setSelectedDate(dateStr, false);
+        });
+
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-center justify-between w-full';
+
+        const dayNum = document.createElement('span');
+        dayNum.className = `text-xs sm:text-sm font-bold tabular-nums ${
+          isToday ? 'px-1.5 py-0.5 rounded-md bg-amber-400 text-slate-900' : hasWork ? 'text-emerald-900' : 'text-slate-700'
+        }`;
+        dayNum.textContent = day;
+        topRow.appendChild(dayNum);
+
+        if (hasWork) {
+          const checkBadge = document.createElement('span');
+          checkBadge.className = 'inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-bold shadow-xs';
+          checkBadge.title = `Đã làm ${dayRecords.length} ca (${totalDayHours}h)`;
+          checkBadge.textContent = '✓';
+          topRow.appendChild(checkBadge);
+        }
+
+        cell.appendChild(topRow);
+
+        if (hasWork) {
+          const info = document.createElement('div');
+          info.className = 'w-full';
+          info.innerHTML = `
+            <div class="text-[11px] font-bold text-emerald-700 tabular-nums leading-tight">${totalDayHours.toFixed(1).replace(/\.0$/, '')} giờ</div>
+            <div class="text-[10px] text-slate-500 truncate hidden sm:block">${dayRecords.length} ca</div>
+          `;
+          cell.appendChild(info);
+        } else {
+          const emptyHint = document.createElement('div');
+          emptyHint.className = 'text-[10px] text-slate-300 hidden sm:block';
+          emptyHint.textContent = isToday ? 'Hôm nay' : '';
+          cell.appendChild(emptyHint);
+        }
+
+        grid.appendChild(cell);
+      }
+
+      // Count working days in viewed month
+      const workedDaysInView = Object.keys(mapByDate).filter(d => d.endsWith(`/${pad2(viewMonth)}/${viewYear}`)).length;
+      document.getElementById('selectedDaySummary').textContent = `Tháng ${pad2(viewMonth)}/${viewYear}: ${workedDaysInView} ngày có tick ✓`;
+    }
+
+    function renderSelectedDayPanel() {
+      const panel = document.getElementById('selectedDayShiftsPanel');
+      const list = document.getElementById('selectedDayShiftsList');
+      const dayRecords = records.filter(r => r.date === selectedDateStr);
+
+      if (!selectedDateStr || dayRecords.length === 0) {
+        panel.classList.add('hidden');
+        return;
+      }
+
+      panel.classList.remove('hidden');
+      document.getElementById('selectedDayPanelTitle').textContent = `Ngày ${selectedDateStr} (${dayRecords.length} ca đã chấm công)`;
+      const totalHrs = dayRecords.reduce((s, r) => s + r.hours, 0);
+      const totalSal = dayRecords.reduce((s, r) => s + r.hours * r.rate, 0);
+      document.getElementById('selectedDayPanelTotal').textContent = `${totalHrs}h • ${formatCurrency(totalSal)}`;
+
+      list.innerHTML = '';
+      dayRecords.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-2 bg-white px-3 py-2 rounded-lg border border-emerald-200/80 text-xs';
+        row.innerHTML = `
+          <div>
+            <span class="font-bold text-slate-800 tabular-nums">${r.startTime} - ${r.endTime}</span>
+            <span class="text-slate-500 ml-1.5">(${r.hours}h × ${formatCurrency(r.rate)})</span>
+            ${r.note ? `<span class="text-teal-700 ml-1.5">• ${escapeHtml(r.note)}</span>` : ''}
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="font-bold text-emerald-700 tabular-nums">${formatCurrency(r.hours * r.rate)}</span>
+            <button type="button" data-edit="${escapeHtml(r.id)}" class="text-sky-600 hover:underline font-semibold cursor-pointer">Sửa</button>
+            <button type="button" data-del="${escapeHtml(r.id)}" class="text-rose-600 hover:underline font-semibold cursor-pointer">Xóa</button>
+          </div>
+        `;
+        row.querySelector('[data-edit]').addEventListener('click', () => startEditRecord(r.id));
+        row.querySelector('[data-del]').addEventListener('click', () => deleteRecord(r.id));
+        list.appendChild(row);
+      });
+    }
+
+    // ===================== TABLE & MONTH FILTER RENDERING =====================
+    function getMonthKeyFromDDMMYYYY(ddmmyyyy) {
+      const parts = ddmmyyyy.split('/');
+      if (parts.length !== 3) return '';
+      return `${parts[1]}/${parts[2]}`; // mm/yyyy
+    }
+
+    function populateMonthFilter() {
+      const select = document.getElementById('monthFilterSelect');
+      const prevVal = select.value;
+
+      const currentMonthKey = `${pad2(viewMonth)}/${viewYear}`;
+      const monthSet = new Set([currentMonthKey]);
+      records.forEach(r => {
+        const mk = getMonthKeyFromDDMMYYYY(r.date);
+        if (mk) monthSet.add(mk);
+      });
+
+      const sortedMonths = Array.from(monthSet).sort((a, b) => {
+        const [ma, ya] = a.split('/').map(Number);
+        const [mb, yb] = b.split('/').map(Number);
+        return yb !== ya ? yb - ya : mb - ma;
+      });
+
+      select.innerHTML = '';
+      sortedMonths.forEach(mk => {
+        const opt = document.createElement('option');
+        opt.value = mk;
+        opt.textContent = `Tháng ${mk}`;
+        select.appendChild(opt);
+      });
+
+      const allOpt = document.createElement('option');
+      allOpt.value = 'ALL';
+      allOpt.textContent = 'Tất cả các tháng';
+      select.appendChild(allOpt);
+
+      if (prevVal && (prevVal === 'ALL' || sortedMonths.includes(prevVal))) {
+        select.value = prevVal;
+      } else {
+        select.value = currentMonthKey;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderTableAndKPIs() {
+      const filterVal = document.getElementById('monthFilterSelect').value;
+      const tbody = document.getElementById('recordsTableBody');
+      const tfoot = document.getElementById('recordsTableFoot');
+
+      const filtered = records
+        .filter(r => filterVal === 'ALL' || getMonthKeyFromDDMMYYYY(r.date) === filterVal)
+        .sort((a, b) => {
+          const da = parseDDMMYYYY(a.date);
+          const db = parseDDMMYYYY(b.date);
+          if (!da || !db) return 0;
+          if (da.getTime() !== db.getTime()) return da.getTime() - db.getTime();
+          return a.startTime.localeCompare(b.startTime);
+        });
+
+      const uniqueDates = new Set(filtered.map(r => r.date));
+      const totalHours = filtered.reduce((sum, r) => sum + Number(r.hours || 0), 0);
+      const totalSalary = filtered.reduce((sum, r) => sum + Number(r.hours || 0) * Number(r.rate || 0), 0);
+
+      // Update Top KPI Cards
+      document.getElementById('kpiMonthLabel').textContent = filterVal === 'ALL' ? 'Tất cả các tháng' : `Tháng ${filterVal}`;
+      document.getElementById('kpiWorkDays').textContent = uniqueDates.size;
+      document.getElementById('kpiShiftCount').textContent = `Tổng cộng ${filtered.length} ca làm việc`;
+      document.getElementById('kpiTotalHours').textContent = totalHours.toFixed(1).replace(/\.0$/, '');
+      document.getElementById('kpiTotalSalary').textContent = formatCurrency(totalSalary);
+      document.getElementById('kpiRateHint').textContent = `Đơn giá hiện tại: ${formatCurrency(defaultRate)}/h`;
+
+      tbody.innerHTML = '';
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="py-10 px-4 text-center text-slate-400 text-sm">
+              Chưa có dữ liệu chấm công trong kỳ này. Hãy chọn ngày trên lịch hoặc nhấn <strong>"Nạp dữ liệu mẫu"</strong> để xem thử.
+            </td>
+          </tr>
+        `;
+      } else {
+        filtered.forEach((r, index) => {
+          const dt = parseDDMMYYYY(r.date);
+          const weekday = dt ? getWeekdayVi(dt) : '';
+          const rowTotal = r.hours * r.rate;
+
+          let badgeHtml = '';
+          if (r.startTime === '20:00' && r.endTime === '01:00') {
+            badgeHtml = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-800">Ca 1 • 20:00 - 01:00</span>`;
+          } else if (r.startTime === '19:00' && r.endTime === '01:00') {
+            badgeHtml = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800">Ca 2 • 19:00 - 01:00</span>`;
+          } else {
+            badgeHtml = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800">Tự chọn • ${escapeHtml(r.startTime)} - ${escapeHtml(r.endTime)}</span>`;
+          }
+
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-teal-50/30 transition';
+          tr.innerHTML = `
+            <td class="py-3.5 px-4 text-center text-xs font-semibold text-slate-500 tabular-nums">${index + 1}</td>
+            <td class="py-3.5 px-4">
+              <div class="font-bold text-slate-800 tabular-nums">${escapeHtml(r.date)}</div>
+              <div class="text-xs text-slate-500">${weekday}</div>
+            </td>
+            <td class="py-3.5 px-4">${badgeHtml}</td>
+            <td class="py-3.5 px-4 text-xs text-slate-600 max-w-xs truncate">${r.note ? escapeHtml(r.note) : '<span class="text-slate-300">—</span>'}</td>
+            <td class="py-3.5 px-4 text-right font-bold text-sky-700 tabular-nums">${Number(r.hours).toFixed(1).replace(/\.0$/, '')} h</td>
+            <td class="py-3.5 px-4 text-right text-xs font-medium text-slate-600 tabular-nums">${formatCurrency(r.rate)}</td>
+            <td class="py-3.5 px-4 text-right font-bold text-slate-900 tabular-nums">${formatCurrency(rowTotal)}</td>
+            <td class="py-3.5 px-4 text-center">
+              <div class="inline-flex items-center gap-1.5">
+                <button type="button" data-edit="${escapeHtml(r.id)}" class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-semibold cursor-pointer">Sửa</button>
+                <button type="button" data-del="${escapeHtml(r.id)}" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold cursor-pointer">Xóa</button>
+              </div>
+            </td>
+          `;
+          tr.querySelector('[data-edit]').addEventListener('click', () => startEditRecord(r.id));
+          tr.querySelector('[data-del]').addEventListener('click', () => deleteRecord(r.id));
+          tbody.appendChild(tr);
+        });
+      }
+
+      // Monthly TOTAL Row at bottom of table
+      const totalLabel = filterVal === 'ALL' ? 'TOTAL TẤT CẢ CÁC THÁNG' : `TOTAL THÁNG ${filterVal}`;
+      tfoot.innerHTML = `
+        <tr class="bg-gradient-to-r from-teal-50 to-sky-50 border-t-2 border-teal-600 font-bold text-slate-900">
+          <td colspan="4" class="py-4 px-4 text-xs sm:text-sm uppercase tracking-wide text-teal-900">
+            ${totalLabel}
+            <span class="ml-2 font-semibold normal-case text-teal-700">(${uniqueDates.size} ngày làm việc • ${filtered.length} ca)</span>
+          </td>
+          <td class="py-4 px-4 text-right text-sm sm:text-base text-sky-800 tabular-nums">
+            ${totalHours.toFixed(1).replace(/\.0$/, '')} giờ
+          </td>
+          <td class="py-4 px-4 text-right text-xs font-medium text-slate-500">—</td>
+          <td class="py-4 px-4 text-right text-base sm:text-lg text-teal-800 tabular-nums">
+            ${formatCurrency(totalSalary)}
+          </td>
+          <td class="py-4 px-4"></td>
+        </tr>
+      `;
+    }
+
+    function refreshAllViews() {
+      populateMonthFilter();
+      renderCalendar();
+      renderSelectedDayPanel();
+      renderTableAndKPIs();
+    }
+
+    // ===================== CSV & JSON BACKUP / RESTORE =====================
+    function exportToCSV() {
+      const filterVal = document.getElementById('monthFilterSelect').value;
+      const filtered = records.filter(r => filterVal === 'ALL' || getMonthKeyFromDDMMYYYY(r.date) === filterVal);
+      if (filtered.length === 0) {
+        showToast('Không có dữ liệu trong kỳ đang lọc để xuất CSV.', 'warning');
+        return;
+      }
+
+      const headers = ['STT', 'Ngay_lam', 'Thu', 'Gio_vao', 'Gio_ra', 'So_gio', 'Don_gia_VND', 'Thanh_tien_VND', 'Ghi_chu'];
+      const rows = filtered.map((r, i) => {
+        const dt = parseDDMMYYYY(r.date);
+        const weekday = dt ? getWeekdayVi(dt) : '';
+        return [
+          i + 1,
+          r.date,
+          weekday,
+          r.startTime,
+          r.endTime,
+          r.hours,
+          r.rate,
+          Math.round(r.hours * r.rate),
+          `"${String(r.note || '').replace(/"/g, '""')}"`
+        ].join(',');
+      });
+
+      const totalHours = filtered.reduce((s, r) => s + r.hours, 0);
+      const totalSalary = filtered.reduce((s, r) => s + r.hours * r.rate, 0);
+      rows.push(['TOTAL', filterVal, '', '', '', totalHours, '', Math.round(totalSalary), ''].join(','));
+
+      const csvContent = '﻿' + [headers.join(','), ...rows].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileSlug = filterVal === 'ALL' ? 'tat-ca' : filterVal.replace('/', '-');
+      a.download = `bang_cham_cong_${fileSlug}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Đã xuất file Excel (CSV) thành công!');
+    }
+
+    function exportToJSON() {
+      const nowStr = `${formatDateDDMMYYYY(new Date())} ${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`;
+      const payload = {
+        app: 'ChamCongTinhLuong',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        defaultRate,
+        records
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_cham_cong_${formatDateDDMMYYYY(new Date()).replace(/\//g, '-')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      localStorage.setItem(BACKUP_META_KEY, nowStr);
+      document.getElementById('lastBackupBadge').textContent = `Sao lưu JSON: ${nowStr}`;
+      showToast('Đã tải xuống file sao lưu JSON!');
+    }
+
+    function normalizeImportedRecords(rawList) {
+      if (!Array.isArray(rawList)) return [];
+      const valid = [];
+      rawList.forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        const normDate = normalizeDDMMYYYY(item.date);
+        if (!normDate) return;
+
+        let start = item.startTime;
+        let end = item.endTime;
+        if ((!start || !end) && typeof item.shift === 'string') {
+          const parts = item.shift.replace(/\s+/g, '').split('-');
+          if (parts.length === 2) {
+            start = parts[0];
+            end = parts[1];
+          }
+        }
+        const sParsed = parseTimeHHMM(start);
+        const eParsed = parseTimeHHMM(end);
+        if (!sParsed || !eParsed) return;
+
+        const hours = Number(item.hours) > 0 ? Number(item.hours) : calcDurationHours(sParsed.formatted, eParsed.formatted);
+        const rate = Number(item.rate) >= 0 ? Number(item.rate) : defaultRate;
+        const mode = (sParsed.formatted === '20:00' && eParsed.formatted === '01:00')
+          ? '20:00-01:00'
+          : (sParsed.formatted === '19:00' && eParsed.formatted === '01:00')
+            ? '19:00-01:00'
+            : 'custom';
+
+        valid.push({
+          id: item.id ? String(item.id) : `rec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          date: normDate,
+          mode,
+          startTime: sParsed.formatted,
+          endTime: eParsed.formatted,
+          hours,
+          rate,
+          note: String(item.note || '')
+        });
+      });
+      return valid;
+    }
+
+    // ===================== GOOGLE DRIVE SYNC =====================
+    function driveSnapshot() {
+      return JSON.stringify({ defaultRate, records });
+    }
+
+    function loadDriveBase() {
+      try {
+        return JSON.parse(localStorage.getItem(DRIVE_BASE_KEY) || 'null');
+      } catch {
+        return null;
+      }
+    }
+
+    function updateDriveUI(message, tone = 'pending') {
+      const colors = { pending: 'bg-amber-400', synced: 'bg-emerald-500', error: 'bg-rose-500' };
+      document.getElementById('syncStatusDot').className = `w-2.5 h-2.5 rounded-full ${colors[tone]}`;
+      document.getElementById('syncStatusText').textContent = message;
+      for (const id of ['btnDriveSyncNow', 'btnDrivePullNow']) {
+        const button = document.getElementById(id);
+        button.classList.toggle('hidden', !driveAccessToken);
+        button.disabled = driveSyncing;
+      }
+    }
+
+    function connectDriveOAuth() {
+      const clientId = localStorage.getItem(DRIVE_CLIENT_ID_KEY);
+      if (!clientId) {
+        document.getElementById('driveConfigPanel').classList.remove('hidden');
+        showToast('Hãy lưu Google OAuth Client ID để kết nối Drive.', 'warning');
+        return;
+      }
+      const oauth = window.google?.accounts?.oauth2;
+      if (!oauth) {
+        showToast('Chưa tải được Google OAuth. Kiểm tra mạng rồi thử lại.', 'error');
+        return;
+      }
+      if (driveSyncing || driveConnecting) return;
+      driveConnecting = true;
+      const fail = () => {
+        driveConnecting = false;
+        showToast('Kết nối Google Drive chưa hoàn tất. Hãy thử lại.', 'error');
+      };
+      try {
+        const client = oauth.initTokenClient({
+          client_id: clientId,
+          scope: DRIVE_SCOPE,
+          callback: (response) => {
+            if (!response.access_token || !oauth.hasGrantedAllScopes(response, DRIVE_SCOPE)) {
+              fail();
+              return;
+            }
+            driveConnecting = false;
+            driveAccessToken = response.access_token;
+            syncDrive('connect');
+          },
+          error_callback: fail
+        });
+        client.requestAccessToken({ prompt: driveAccessToken ? 'select_account' : '' });
+      } catch {
+        fail();
+      }
+    }
+
+    async function driveRequest(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        cache: 'no-store',
+        headers: { ...options.headers, Authorization: `Bearer ${driveAccessToken}` },
+        signal: AbortSignal.timeout(20000)
+      });
+      if (response.status === 401) {
+        driveAccessToken = null;
+        throw new Error('Phiên Google đã hết hạn. Bấm Kết nối Google Drive để tiếp tục.');
+      }
+      if (response.status === 403) {
+        throw new Error('Drive từ chối yêu cầu. Kiểm tra quyền drive.appdata, Drive API và hạn mức.');
+      }
+      if (!response.ok) throw new Error(`Google Drive trả lỗi ${response.status}. Hãy thử đồng bộ lại.`);
+      return response.json();
+    }
+
+    async function readDriveBackup() {
+      const query = new URLSearchParams({
+        spaces: 'appDataFolder',
+        q: `name = '${DRIVE_FILE_NAME}' and trashed = false`,
+        fields: 'nextPageToken,files(id,version)',
+        pageSize: '100'
+      });
+      let file;
+      do {
+        const page = await driveRequest(`${DRIVE_FILES_URL}?${query}`);
+        for (const candidate of page.files || []) {
+          if (file) throw new Error('Drive có nhiều bản chấm công cùng tên. Dữ liệu trên máy vẫn được giữ.');
+          file = candidate;
+        }
+        if (!page.nextPageToken) break;
+        query.set('pageToken', page.nextPageToken);
+      } while (true);
+      if (!file) return null;
+
+      const url = `${DRIVE_FILES_URL}/${encodeURIComponent(file.id)}`;
+      const payload = await driveRequest(`${url}?alt=media`);
+      const latest = await driveRequest(`${url}?fields=version`);
+      if (latest.version !== file.version) {
+        throw new Error('Dữ liệu Drive vừa thay đổi. Hãy thử đồng bộ lại.');
+      }
+      if (payload.version !== 1 || !Number.isFinite(payload.defaultRate) ||
+          payload.defaultRate < 0 || !Array.isArray(payload.records)) {
+        throw new Error('Bản chấm công trên Drive có định dạng không hợp lệ.');
+      }
+      const normalized = normalizeImportedRecords(payload.records);
+      const ids = new Set();
+      if (normalized.length !== payload.records.length || normalized.some((record, index) => {
+        const source = payload.records[index];
+        if (typeof source.id !== 'string' || !source.id || ids.has(source.id) ||
+            !Number.isFinite(source.hours) || source.hours <= 0 ||
+            !Number.isFinite(source.rate) || source.rate < 0) return true;
+        ids.add(source.id);
+        if (source.mode === 'custom') record.mode = 'custom';
+        return false;
+      })) throw new Error('Bản chấm công trên Drive có ca không hợp lệ.');
+      return { ...file, snapshot: JSON.stringify({ defaultRate: payload.defaultRate, records: normalized }) };
+    }
+
+    async function writeDriveBackup(file, snapshot) {
+      const payload = JSON.stringify({ version: 1, ...JSON.parse(snapshot) });
+      if (file) {
+        const id = encodeURIComponent(file.id);
+        const latest = await driveRequest(`${DRIVE_FILES_URL}/${id}?fields=version`);
+        if (latest.version !== file.version) throw new Error('Dữ liệu Drive vừa thay đổi. Hãy thử đồng bộ lại.');
+        return driveRequest(`${DRIVE_UPLOAD_URL}/${id}?uploadType=media&fields=id,version`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload
+        });
+      }
+      const boundary = `cham_cong_${crypto.randomUUID()}`;
+      const metadata = JSON.stringify({ name: DRIVE_FILE_NAME, parents: ['appDataFolder'], mimeType: 'application/json' });
+      const body = [
+        `--${boundary}`, 'Content-Type: application/json; charset=UTF-8', '', metadata,
+        `--${boundary}`, 'Content-Type: application/json; charset=UTF-8', '', payload,
+        `--${boundary}--`, ''
+      ].join('\r\n');
+      return driveRequest(`${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,version`, {
+        method: 'POST',
+        headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body
+      });
+    }
+
+    function rememberDriveBackup(file, snapshot) {
+      localStorage.setItem(DRIVE_BASE_KEY, JSON.stringify({ id: file.id, version: file.version, snapshot }));
+    }
+
+    async function syncDrive(action = 'auto') {
+      if (!driveAccessToken || driveConnecting) return;
+      if (action === 'refresh' && document.getElementById('editingRecordId').value) return;
+      if (driveSyncing) {
+        if (action === 'auto') driveSyncQueued = true;
+        return;
+      }
+      driveSyncing = true;
+      updateDriveUI('Đang kiểm tra dữ liệu Google Drive…');
+      let message;
+      let tone = 'pending';
+      try {
+        const file = await readDriveBackup();
+        const local = driveSnapshot();
+        const base = loadDriveBase();
+        const isSameFile = Boolean(file && base?.id === file.id);
+        const localChanged = base ? base.snapshot !== local : records.length > 0 || defaultRate !== 40000;
+        const cloudChanged = Boolean(file && (!isSameFile || base.version !== file.version));
+        const differentBackup = Boolean(file && base && !isSameFile);
+
+        if (!file && action !== 'push') {
+          message = 'Chưa có dữ liệu trên Drive. Bấm Lưu lên Drive để tạo bản đầu tiên.';
+        } else if (file && action === 'pull' && local !== file.snapshot && (localChanged || differentBackup) &&
+            !window.confirm('Tải bản Drive sẽ thay thế dữ liệu đang có trên trình duyệt này. Bạn đã sao lưu JSON và muốn tiếp tục?')) {
+          message = 'Đã giữ dữ liệu trên máy. Bạn có thể xuất JSON trước khi tải lại từ Drive.';
+        } else if (file && (local === file.snapshot || action === 'pull' || (cloudChanged && !localChanged && !differentBackup && !document.getElementById('editingRecordId').value))) {
+          if (local !== file.snapshot) {
+            const rateInput = document.getElementById('hourlyRateInput');
+            const useSyncedRate = Number(rateInput.value) === defaultRate;
+            ({ records, defaultRate } = JSON.parse(file.snapshot));
+            saveLocalData(false);
+            if (action === 'pull') resetFormToAddMode();
+            else if (useSyncedRate) rateInput.value = defaultRate;
+            refreshAllViews();
+          }
+          rememberDriveBackup(file, file.snapshot);
+          message = `Đã tải dữ liệu từ Drive (${records.length} ca).`;
+          tone = 'synced';
+        } else if (file && cloudChanged) {
+          message = 'Dữ liệu trên máy và Drive khác nhau. Xuất JSON trên máy, rồi tải bản Drive và nhập gộp nếu cần.';
+          tone = 'error';
+        } else if (!file && base && !window.confirm('Tài khoản Drive này chưa có bản chấm công. Tạo bản mới từ dữ liệu trên máy?')) {
+          message = 'Dữ liệu vẫn đang lưu trên máy.';
+        } else if (localChanged || action === 'push') {
+          const saved = await writeDriveBackup(file, local);
+          rememberDriveBackup(saved, local);
+          message = `Đã lưu lên Drive lúc ${new Date().toLocaleTimeString('vi-VN')}.`;
+          tone = 'synced';
+        } else {
+          message = 'Dữ liệu đã đồng bộ với Google Drive.';
+          tone = 'synced';
+        }
+      } catch (error) {
+        message = error instanceof TypeError || error.name === 'TimeoutError'
+          ? 'Chưa kết nối được Drive. Dữ liệu vẫn lưu trên máy. Hãy thử đồng bộ lại khi có mạng.'
+          : error.message;
+        tone = 'error';
+      } finally {
+        driveSyncing = false;
+        updateDriveUI(message, tone);
+        const queued = driveSyncQueued;
+        driveSyncQueued = false;
+        if (queued && tone === 'synced') syncDrive();
+      }
+    }
+
+    // ===================== SAMPLE DATA =====================
+    function seedSampleRecords() {
+      const y = viewYear;
+      const m = pad2(viewMonth);
+      const samples = [
+        { date: `02/${m}/${y}`, mode: '20:00-01:00', startTime: '20:00', endTime: '01:00', hours: 5, rate: defaultRate, note: 'Ca tối cố định 1' },
+        { date: `05/${m}/${y}`, mode: '19:00-01:00', startTime: '19:00', endTime: '01:00', hours: 6, rate: defaultRate, note: 'Ca tối tăng cường' },
+        { date: `09/${m}/${y}`, mode: '20:00-01:00', startTime: '20:00', endTime: '01:00', hours: 5, rate: defaultRate, note: '' },
+        { date: `14/${m}/${y}`, mode: 'custom', startTime: '18:30', endTime: '23:00', hours: 4.5, rate: defaultRate, note: 'Ca tự chọn cuối tuần' },
+        { date: `18/${m}/${y}`, mode: '19:00-01:00', startTime: '19:00', endTime: '01:00', hours: 6, rate: defaultRate, note: '' }
+      ];
+      samples.forEach((s, idx) => {
+        const exists = records.some(r => r.date === s.date && r.startTime === s.startTime && r.endTime === s.endTime);
+        if (!exists) {
+          records.push({ id: `sample_${Date.now()}_${idx}`, ...s });
+        }
+      });
+      saveLocalData(true);
+      refreshAllViews();
+      showToast(`Đã nạp dữ liệu mẫu cho Tháng ${m}/${y}!`);
+    }
+
+    // ===================== EVENT LISTENERS =====================
+    document.addEventListener('DOMContentLoaded', () => {
+      loadLocalData();
+      updateRealtimeClock();
+      setInterval(updateRealtimeClock, 1000);
+
+      const todayStr = formatDateDDMMYYYY(new Date());
+      setSelectedDate(todayStr, true);
+      updateShiftRadioStyles();
+      refreshAllViews();
+
+      // Today buttons
+      document.getElementById('btnPickToday').addEventListener('click', () => {
+        setSelectedDate(formatDateDDMMYYYY(new Date()), true);
+        showToast('Đã chọn ngày hôm nay');
+      });
+      document.getElementById('btnFormToday').addEventListener('click', () => {
+        setSelectedDate(formatDateDDMMYYYY(new Date()), true);
+      });
+
+      // Date text input auto-slash & sync
+      const dateInput = document.getElementById('workDateInput');
+      dateInput.addEventListener('input', (e) => {
+        let v = e.target.value.replace(/[^\d/]/g, '');
+        if (v.length === 2 && !v.includes('/')) v += '/';
+        if (v.length === 5 && v.split('/').length === 2) v += '/';
+        e.target.value = v;
+        const dt = parseDDMMYYYY(v);
+        if (dt) {
+          selectedDateStr = formatDateDDMMYYYY(dt);
+          document.getElementById('dateWeekdayHint').textContent = `Đã chọn: ${getWeekdayVi(dt)}, ngày ${selectedDateStr}`;
+          viewYear = dt.getFullYear();
+          viewMonth = dt.getMonth() + 1;
+          renderCalendar();
+          renderSelectedDayPanel();
+        }
+      });
+
+      // Shift radios & custom time inputs
+      document.querySelectorAll('input[name="shiftMode"]').forEach(r => {
+        r.addEventListener('change', updateShiftRadioStyles);
+      });
+      ['customStartInput', 'customEndInput', 'hourlyRateInput'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateFormPreview);
+      });
+
+      // Form submit
+      document.getElementById('attendanceForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const normDate = normalizeDDMMYYYY(document.getElementById('workDateInput').value);
+        if (!normDate) {
+          showToast('Ngày làm việc không hợp lệ! Vui lòng nhập đúng dd/mm/yyyy.', 'error');
+          return;
+        }
+        const shift = getSelectedShiftDetails();
+        if (!shift || shift.hours <= 0) {
+          showToast('Khung giờ tự chọn không hợp lệ! Vui lòng nhập định dạng hh:mm.', 'error');
+          return;
+        }
+        const rate = Math.max(0, parseFloat(document.getElementById('hourlyRateInput').value) || 0);
+        const note = document.getElementById('noteInput').value.trim();
+        const editingId = document.getElementById('editingRecordId').value;
+
+        defaultRate = rate;
+
+        if (editingId) {
+          const idx = records.findIndex(r => r.id === editingId);
+          if (idx !== -1) {
+            records[idx] = {
+              ...records[idx],
+              date: normDate,
+              mode: shift.mode,
+              startTime: shift.startTime,
+              endTime: shift.endTime,
+              hours: shift.hours,
+              rate,
+              note
+            };
+            showToast(`Đã cập nhật ca làm ngày ${normDate}!`);
+          }
+          resetFormToAddMode();
+        } else {
+          records.push({
+            id: `rec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            date: normDate,
+            mode: shift.mode,
+            startTime: shift.startTime,
+            endTime: shift.endTime,
+            hours: shift.hours,
+            rate,
+            note
+          });
+          document.getElementById('noteInput').value = '';
+          showToast(`Đã chấm công ngày ${normDate} (${shift.hours}h • ${formatCurrency(shift.hours * rate)})`);
+        }
+
+        const dt = parseDDMMYYYY(normDate);
+        if (dt) {
+          viewYear = dt.getFullYear();
+          viewMonth = dt.getMonth() + 1;
+          selectedDateStr = normDate;
+        }
+        saveLocalData(true);
+        refreshAllViews();
+        document.getElementById('monthFilterSelect').value = getMonthKeyFromDDMMYYYY(normDate);
+        renderTableAndKPIs();
+      });
+
+      document.getElementById('btnCancelEdit').addEventListener('click', resetFormToAddMode);
+
+      // Calendar navigation
+      document.getElementById('btnPrevMonth').addEventListener('click', () => {
+        viewMonth--;
+        if (viewMonth < 1) { viewMonth = 12; viewYear--; }
+        renderCalendar();
+        document.getElementById('monthFilterSelect').value = `${pad2(viewMonth)}/${viewYear}`;
+        renderTableAndKPIs();
+      });
+      document.getElementById('btnNextMonth').addEventListener('click', () => {
+        viewMonth++;
+        if (viewMonth > 12) { viewMonth = 1; viewYear++; }
+        renderCalendar();
+        document.getElementById('monthFilterSelect').value = `${pad2(viewMonth)}/${viewYear}`;
+        renderTableAndKPIs();
+      });
+
+      // Month filter
+      document.getElementById('monthFilterSelect').addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val !== 'ALL' && val.includes('/')) {
+          const [m, y] = val.split('/').map(Number);
+          viewMonth = m;
+          viewYear = y;
+          renderCalendar();
+        }
+        renderTableAndKPIs();
+      });
+
+      // Export / Import / Sample / Clear
+      document.getElementById('btnExportCsv').addEventListener('click', exportToCSV);
+      document.getElementById('btnExportJson').addEventListener('click', exportToJSON);
+      document.getElementById('btnSeedSample').addEventListener('click', seedSampleRecords);
+      document.getElementById('btnClearAll').addEventListener('click', () => {
+        if (records.length === 0) return;
+        records = [];
+        resetFormToAddMode();
+        saveLocalData(true);
+        refreshAllViews();
+        showToast('Đã xóa toàn bộ dữ liệu chấm công.', 'warning');
+      });
+
+      document.getElementById('inputImportJson').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const parsed = JSON.parse(ev.target.result);
+            const list = Array.isArray(parsed) ? parsed : parsed.records;
+            const normalized = normalizeImportedRecords(list);
+            if (normalized.length === 0) {
+              showToast('File JSON không có bản ghi chấm công hợp lệ.', 'error');
+              return;
+            }
+            pendingImportedRate = Number.isFinite(parsed.defaultRate) && parsed.defaultRate >= 0
+              ? parsed.defaultRate : undefined;
+            pendingImportedRecords = normalized;
+            document.getElementById('importModalDesc').textContent =
+              `Tìm thấy ${normalized.length} ca làm việc hợp lệ trong file "${file.name}". Bạn muốn gộp vào dữ liệu hiện tại hay thay thế toàn bộ?`;
+            document.getElementById('importModal').classList.remove('hidden');
+          } catch {
+            showToast('Không thể đọc file JSON. Vui lòng kiểm tra định dạng.', 'error');
+          }
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById('btnImportMerge').addEventListener('click', () => {
+        let added = 0;
+        pendingImportedRecords.forEach(item => {
+          const dup = records.some(r => r.id === item.id || (r.date === item.date && r.startTime === item.startTime && r.endTime === item.endTime && r.hours === item.hours));
+          if (!dup) {
+            records.push(item);
+            added++;
+          }
+        });
+        if (pendingImportedRate !== undefined) {
+          defaultRate = pendingImportedRate;
+          document.getElementById('hourlyRateInput').value = defaultRate;
+        }
+        saveLocalData(true);
+        refreshAllViews();
+        document.getElementById('importModal').classList.add('hidden');
+        showToast(`Đã gộp thêm ${added} ca làm mới!`);
+      });
+
+      document.getElementById('btnImportReplace').addEventListener('click', () => {
+        records = [...pendingImportedRecords];
+        if (pendingImportedRate !== undefined) {
+          defaultRate = pendingImportedRate;
+          document.getElementById('hourlyRateInput').value = defaultRate;
+        }
+        saveLocalData(true);
+        refreshAllViews();
+        document.getElementById('importModal').classList.add('hidden');
+        showToast(`Đã khôi phục ${records.length} ca làm việc!`);
+      });
+
+      document.getElementById('btnImportCancel').addEventListener('click', () => {
+        pendingImportedRecords = [];
+        pendingImportedRate = undefined;
+        document.getElementById('importModal').classList.add('hidden');
+      });
+
+      // Google Drive configuration and sync
+      document.getElementById('btnOpenDriveConfig').addEventListener('click', () => {
+        document.getElementById('driveConfigPanel').classList.toggle('hidden');
+      });
+      document.getElementById('btnCloseDriveConfig').addEventListener('click', () => {
+        document.getElementById('driveConfigPanel').classList.add('hidden');
+      });
+      document.getElementById('btnSaveClientId').addEventListener('click', () => {
+        if (driveSyncing || driveConnecting) return;
+        const clientId = document.getElementById('googleClientIdInput').value.trim();
+        if (!/^[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(clientId)) {
+          showToast('Client ID phải có đuôi .apps.googleusercontent.com.', 'error');
+          return;
+        }
+        if (clientId !== localStorage.getItem(DRIVE_CLIENT_ID_KEY)) {
+          driveAccessToken = null;
+          localStorage.setItem(DRIVE_CLIENT_ID_KEY, clientId);
+          updateDriveUI('Đã lưu Client ID. Bấm Kết nối Google Drive.');
+        }
+        document.getElementById('driveConfigPanel').classList.add('hidden');
+        showToast('Đã lưu Google OAuth Client ID!');
+      });
+      document.getElementById('btnDriveConnect').addEventListener('click', connectDriveOAuth);
+      document.getElementById('btnDriveSyncNow').addEventListener('click', () => syncDrive('push'));
+      document.getElementById('btnDrivePullNow').addEventListener('click', () => syncDrive('pull'));
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') syncDrive('refresh');
+      });
+      window.addEventListener('online', () => syncDrive('refresh'));
+    });
+  </script>
+</body>
+</html>
