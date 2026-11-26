@@ -402,6 +402,23 @@
     </form>
   </dialog>
 
+  <dialog id="driveConflictDialog" aria-labelledby="driveConflictTitle" aria-describedby="driveConflictSummary driveConflictDescription"
+    class="fixed inset-0 m-auto w-11/12 max-w-md rounded-2xl border border-slate-200 bg-white p-5 text-slate-800 shadow-xl backdrop:bg-slate-900/50">
+    <h2 id="driveConflictTitle" class="text-base font-bold">Chọn bản dữ liệu chấm công</h2>
+    <p id="driveConflictSummary" class="mt-2 text-sm font-medium"></p>
+    <p id="driveConflictDescription" class="mt-2 text-sm text-slate-600">
+      Dùng bản Drive sẽ thay dữ liệu trên trình duyệt. Xuất JSON trước nếu bạn cần giữ bản hiện tại.
+    </p>
+    <p id="driveConflictBackupStatus" class="mt-2 text-sm text-teal-700" role="status" hidden></p>
+    <form method="dialog" class="mt-5 flex flex-wrap justify-end gap-2">
+      <button type="submit" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold cursor-pointer" autofocus>Quay lại</button>
+      <button id="btnBackupDriveConflict" type="button"
+        class="rounded-lg border border-teal-600 px-3 py-2 text-xs font-semibold text-teal-700 cursor-pointer">Xuất Backup JSON</button>
+      <button id="btnApplyDriveConflict" type="button"
+        class="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-700 cursor-pointer">Dùng bản Drive</button>
+    </form>
+  </dialog>
+
   <!-- JSON Import Mode Modal -->
   <div id="importModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl border border-slate-200 space-y-4">
@@ -1332,8 +1349,17 @@
       refreshAllViews();
     }
 
+    function showDriveConflict(file, editing) {
+      const cloudCount = JSON.parse(file.snapshot).records.length;
+      document.getElementById('driveConflictSummary').textContent =
+        `Trên máy có ${records.length} ca. Trên Drive có ${cloudCount} ca.` +
+        (editing ? ' Ca đang sửa chưa được lưu.' : '');
+      document.getElementById('driveConflictBackupStatus').hidden = true;
+      document.getElementById('driveConflictDialog').showModal();
+    }
+
     async function syncDrive(action = 'auto') {
-      if (!driveSession || driveConnecting) return;
+      if (!driveSession || driveConnecting || document.getElementById('driveConflictDialog').open) return;
       if (action === 'refresh' && document.getElementById('editingRecordId').value) return;
       if (driveSyncing) {
         if (action === 'auto') driveSyncQueued = true;
@@ -1370,17 +1396,22 @@
           (action === 'connect' && hasLocalData) ||
           (driveSession.readyForFirstSave && hasLocalData && (action === 'auto' || action === 'refresh')));
 
-        if (!file && !canCreate) {
+        if (action === 'use-drive') {
+          if (file) {
+            applyDriveSnapshot(file.snapshot, true);
+            rememberDriveBackup(file, file.snapshot);
+            message = `Đã dùng bản Drive (${records.length} ca).`;
+            tone = 'synced';
+          } else {
+            message = 'Không tìm thấy bản Drive. Dữ liệu vẫn đang lưu trên máy.';
+            tone = 'error';
+          }
+        } else if (!file && !canCreate) {
           message = driveSession.readyForFirstSave
             ? 'Đã kết nối Drive. Ca đầu tiên sẽ tự lưu lên Drive.'
             : 'Chưa có dữ liệu trên Drive. Bấm Lưu lên Drive để tạo bản đầu tiên.';
-        } else if (file && action === 'pull' && !merged && (!isSameFile || cloudChanged) &&
-            local !== file.snapshot && (localChanged || differentBackup) &&
-            !window.confirm('Tải bản Drive sẽ thay thế dữ liệu đang có trên trình duyệt này. Bạn đã sao lưu JSON và muốn tiếp tục?')) {
-          message = 'Đã giữ dữ liệu trên máy. Bạn có thể xuất JSON trước khi tải lại từ Drive.';
-        } else if (file && (local === file.snapshot || (action === 'pull' && !merged && (!isSameFile || cloudChanged)) ||
-            (cloudChanged && !localChanged && !differentBackup && !editing))) {
-          if (local !== file.snapshot) applyDriveSnapshot(file.snapshot, action === 'pull');
+        } else if (file && (local === file.snapshot || (cloudChanged && !localChanged && !differentBackup && !editing))) {
+          if (local !== file.snapshot) applyDriveSnapshot(file.snapshot, false);
           rememberDriveBackup(file, file.snapshot);
           message = `Đã tải dữ liệu từ Drive (${records.length} ca).`;
           tone = 'synced';
@@ -1395,10 +1426,11 @@
           message = 'Đã gộp và đồng bộ các thay đổi trên máy và Drive.';
           tone = 'synced';
         } else if (file && cloudChanged) {
-          message = isSameFile && !editing
-            ? 'Cùng một ca đã thay đổi trên máy và Drive. Xuất JSON trước khi chọn bản muốn giữ.'
-            : 'Bản trên máy và Drive chưa có bản đồng bộ chung, hoặc bạn đang sửa ca. Kiểm tra trước khi tải bản Drive.';
-          tone = 'error';
+          message = editing
+            ? 'Lưu hoặc hủy ca đang sửa, hoặc bấm Refresh dữ liệu để chọn bản Drive.'
+            : 'Hai bản có khác biệt. Bấm Refresh dữ liệu để chọn cách xử lý.';
+          tone = 'pending';
+          if (action === 'pull') showDriveConflict(file, editing);
         } else if (canCreate && (action === 'connect' || (action === 'push' && base && !driveSession.readyForFirstSave)) &&
             !window.confirm('Google Drive chưa có bản chấm công. Bạn muốn lưu dữ liệu trên máy lên Drive?')) {
           message = 'Dữ liệu vẫn đang lưu trên máy.';
@@ -1693,6 +1725,16 @@
       });
       document.getElementById('btnDriveSyncNow').addEventListener('click', () => syncDrive('push'));
       document.getElementById('btnDrivePullNow').addEventListener('click', () => syncDrive('pull'));
+      document.getElementById('btnBackupDriveConflict').addEventListener('click', () => {
+        exportToJSON();
+        const status = document.getElementById('driveConflictBackupStatus');
+        status.hidden = false;
+        status.textContent = 'Đã xuất JSON. Bạn có thể kiểm tra file trong thư mục tải xuống.';
+      });
+      document.getElementById('btnApplyDriveConflict').addEventListener('click', () => {
+        document.getElementById('driveConflictDialog').close();
+        if (requireDriveForChanges()) syncDrive('use-drive');
+      });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') syncDrive('refresh');
       });
