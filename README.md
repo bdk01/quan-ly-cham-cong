@@ -22,8 +22,8 @@
 2. Trong [Google Cloud Console](https://console.cloud.google.com/apis/library/drive.googleapis.com), tạo project và bật **Google Drive API**.
 3. Trong **Google Auth Platform**, cấu hình **Branding** và **Audience**. Với Gmail cá nhân, chọn **External**. Nếu ứng dụng ở chế độ **Testing**, thêm Gmail của bạn vào **Test users**. Trong **Data Access**, thêm scope `https://www.googleapis.com/auth/drive.appdata`.
 4. Trong **Clients**, tạo OAuth Client ID loại **Web application**. Thêm origin của web vào **Authorized JavaScript origins**. Ví dụ, với `https://ten-github.github.io/cham-cong/`, nhập `https://ten-github.github.io`. Giữ Client Secret và access token ngoài repo.
-5. Mở link đã deploy. Chọn **Cấu hình Drive**, dán Client ID và lưu, rồi bấm **Kết nối Google Drive**. Dùng cùng Client ID và tài khoản Google trên các thiết bị.
-6. Nếu có dữ liệu trên bản HTML cũ, xuất backup JSON rồi nhập vào web mới. Trên thiết bị có dữ liệu chính, bấm **Lưu lên Drive** để tạo bản đầu tiên. Sau đó kết nối trên các thiết bị còn lại để tải dữ liệu.
+5. Mở link đã deploy. Chọn **Cấu hình Drive**, dán Client ID rồi bấm **Lưu và kết nối Drive**. Chọn tài khoản Google và cấp quyền. Web sẽ kiểm tra bản JSON riêng của ứng dụng và tải dữ liệu về nếu trình duyệt chưa có dữ liệu.
+6. Nếu Drive chưa có bản chấm công và máy có dữ liệu, web sẽ hỏi có muốn lưu bản đầu tiên lên Drive. Dùng cùng Client ID và tài khoản Google trên các thiết bị còn lại để tải bản đó. Với dữ liệu từ bản HTML cũ hoặc một file JSON tải xuống từ Drive, dùng **Nhập JSON** trên thiết bị chứa bản chính trước khi lưu lên Drive.
 
 Web tự lưu thay đổi lên Drive khi phiên Google còn hiệu lực. Khi quay lại tab hoặc có mạng trở lại, web kiểm tra bản mới. Bạn có thể lấy dữ liệu ngay bằng **Tải từ Drive**. Sau khi tải lại trang hoặc khi phiên hết hạn, bấm **Kết nối Google Drive** để tiếp tục đồng bộ.
 

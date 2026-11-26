@@ -97,7 +97,7 @@
         <div class="flex items-center gap-2 self-end">
           <button id="btnSaveClientId" type="button"
             class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold cursor-pointer">
-            Lưu Client ID
+            Lưu và kết nối Drive
           </button>
           <button id="btnCloseDriveConfig" type="button"
             class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 text-xs font-medium cursor-pointer">
@@ -1274,7 +1274,10 @@
         const cloudChanged = Boolean(file && (!isSameFile || base.version !== file.version));
         const differentBackup = Boolean(file && base && !isSameFile);
 
-        if (!file && action !== 'push') {
+        const canCreate = !file && (action === 'push' ||
+          (action === 'connect' && (records.length > 0 || defaultRate !== 40000)));
+
+        if (!file && !canCreate) {
           message = 'Chưa có dữ liệu trên Drive. Bấm Lưu lên Drive để tạo bản đầu tiên.';
         } else if (file && action === 'pull' && local !== file.snapshot && (localChanged || differentBackup) &&
             !window.confirm('Tải bản Drive sẽ thay thế dữ liệu đang có trên trình duyệt này. Bạn đã sao lưu JSON và muốn tiếp tục?')) {
@@ -1295,9 +1298,10 @@
         } else if (file && cloudChanged) {
           message = 'Dữ liệu trên máy và Drive khác nhau. Xuất JSON trên máy, rồi tải bản Drive và nhập gộp nếu cần.';
           tone = 'error';
-        } else if (!file && base && !window.confirm('Tài khoản Drive này chưa có bản chấm công. Tạo bản mới từ dữ liệu trên máy?')) {
+        } else if (canCreate && (action === 'connect' || base) &&
+            !window.confirm('Google Drive chưa có bản chấm công. Bạn muốn lưu dữ liệu trên máy lên Drive?')) {
           message = 'Dữ liệu vẫn đang lưu trên máy.';
-        } else if (localChanged || action === 'push') {
+        } else if (canCreate || localChanged || action === 'push') {
           const saved = await writeDriveBackup(file, local);
           rememberDriveBackup(saved, local);
           message = `Đã lưu lên Drive lúc ${new Date().toLocaleTimeString('vi-VN')}.`;
@@ -1577,7 +1581,7 @@
           updateDriveUI('Đã lưu Client ID. Bấm Kết nối Google Drive.');
         }
         document.getElementById('driveConfigPanel').classList.add('hidden');
-        showToast('Đã lưu Google OAuth Client ID!');
+        connectDriveOAuth();
       });
       document.getElementById('btnDriveConnect').addEventListener('click', connectDriveOAuth);
       document.getElementById('btnDriveSyncNow').addEventListener('click', () => syncDrive('push'));
