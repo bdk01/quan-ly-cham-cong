@@ -387,6 +387,21 @@
 
   </main>
 
+  <dialog id="driveRequiredDialog" aria-labelledby="driveRequiredTitle" aria-describedby="driveRequiredDescription"
+    class="fixed inset-0 m-auto w-11/12 max-w-md rounded-2xl border border-slate-200 bg-white p-5 text-slate-800 shadow-xl backdrop:bg-slate-900/50">
+    <h2 id="driveRequiredTitle" class="text-base font-bold">Kết nối Google Drive để chỉnh sửa</h2>
+    <p id="driveRequiredDescription" class="mt-2 text-sm text-slate-600">
+      Đăng nhập Google để thêm, sửa, xóa hoặc nhập dữ liệu chấm công.
+    </p>
+    <form method="dialog" class="mt-5 flex flex-wrap justify-end gap-2">
+      <button type="submit" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold cursor-pointer" autofocus>Đóng</button>
+      <button id="btnConnectFromDriveDialog" type="button"
+        class="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-700 cursor-pointer">
+        Kết nối Google Drive
+      </button>
+    </form>
+  </dialog>
+
   <!-- JSON Import Mode Modal -->
   <div id="importModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl border border-slate-200 space-y-4">
@@ -635,6 +650,7 @@
     }
 
     function startEditRecord(id) {
+      if (!requireDriveForChanges()) return;
       const rec = records.find(r => r.id === id);
       if (!rec) return;
       document.getElementById('editingRecordId').value = rec.id;
@@ -661,6 +677,7 @@
     }
 
     function deleteRecord(id) {
+      if (!requireDriveForChanges()) return;
       const idx = records.findIndex(r => r.id === id);
       if (idx === -1) return;
       const removed = records[idx];
@@ -1119,6 +1136,17 @@
       }
     }
 
+    function hasActiveDriveSession() {
+      return Boolean(driveSession && driveSession.expiresAt > Date.now());
+    }
+
+    function requireDriveForChanges() {
+      if (hasActiveDriveSession()) return true;
+      const dialog = document.getElementById('driveRequiredDialog');
+      if (!dialog.open) dialog.showModal();
+      return false;
+    }
+
     function updateDriveUI(message, tone = 'pending') {
       const colors = { pending: 'bg-amber-400', synced: 'bg-emerald-500', error: 'bg-rose-500' };
       document.getElementById('syncStatusDot').className = `w-2.5 h-2.5 rounded-full ${colors[tone]}`;
@@ -1311,7 +1339,7 @@
         if (action === 'auto') driveSyncQueued = true;
         return;
       }
-      if (driveSession.expiresAt <= Date.now()) {
+      if (!hasActiveDriveSession()) {
         setDriveSession(null);
         updateDriveUI('Phiên Google đã hết hạn. Bấm Kết nối Google Drive để tiếp tục.');
         return;
@@ -1401,6 +1429,7 @@
 
     // ===================== SAMPLE DATA =====================
     function seedSampleRecords() {
+      if (!requireDriveForChanges()) return;
       const y = viewYear;
       const m = pad2(viewMonth);
       const samples = [
@@ -1468,8 +1497,12 @@
       });
 
       // Form submit
+      document.getElementById('btnSubmitShift').addEventListener('click', (e) => {
+        if (!requireDriveForChanges()) e.preventDefault();
+      });
       document.getElementById('attendanceForm').addEventListener('submit', (e) => {
         e.preventDefault();
+        if (!requireDriveForChanges()) return;
         const normDate = normalizeDDMMYYYY(document.getElementById('workDateInput').value);
         if (!normDate) {
           showToast('Ngày làm việc không hợp lệ! Vui lòng nhập đúng dd/mm/yyyy.', 'error');
@@ -1564,6 +1597,7 @@
       document.getElementById('btnExportJson').addEventListener('click', exportToJSON);
       document.getElementById('btnSeedSample').addEventListener('click', seedSampleRecords);
       document.getElementById('btnClearAll').addEventListener('click', () => {
+        if (!requireDriveForChanges()) return;
         if (records.length === 0) return;
         records = [];
         resetFormToAddMode();
@@ -1572,11 +1606,17 @@
         showToast('Đã xóa toàn bộ dữ liệu chấm công.', 'warning');
       });
 
-      document.getElementById('inputImportJson').addEventListener('change', (e) => {
+      const importInput = document.getElementById('inputImportJson');
+      importInput.addEventListener('click', (e) => {
+        if (!requireDriveForChanges()) e.preventDefault();
+      });
+      importInput.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        e.target.value = '';
+        if (!file || !requireDriveForChanges()) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
+          if (!requireDriveForChanges()) return;
           try {
             const parsed = JSON.parse(ev.target.result);
             const list = Array.isArray(parsed) ? parsed : parsed.records;
@@ -1594,12 +1634,12 @@
           } catch {
             showToast('Không thể đọc file JSON. Vui lòng kiểm tra định dạng.', 'error');
           }
-          e.target.value = '';
         };
         reader.readAsText(file);
       });
 
       document.getElementById('btnImportMerge').addEventListener('click', () => {
+        if (!requireDriveForChanges()) return;
         let added = 0;
         pendingImportedRecords.forEach(item => {
           const dup = records.some(r => r.id === item.id || (r.date === item.date && r.startTime === item.startTime && r.endTime === item.endTime && r.hours === item.hours));
@@ -1619,6 +1659,7 @@
       });
 
       document.getElementById('btnImportReplace').addEventListener('click', () => {
+        if (!requireDriveForChanges()) return;
         records = [...pendingImportedRecords];
         if (pendingImportedRate !== undefined) {
           defaultRate = pendingImportedRate;
@@ -1637,6 +1678,10 @@
       });
 
       // Google Drive sign-in and sync
+      document.getElementById('btnConnectFromDriveDialog').addEventListener('click', () => {
+        document.getElementById('driveRequiredDialog').close();
+        connectDriveOAuth();
+      });
       document.getElementById('btnDriveConnect').addEventListener('click', () => {
         if (driveSyncing || driveConnecting) return;
         if (driveSession) {
