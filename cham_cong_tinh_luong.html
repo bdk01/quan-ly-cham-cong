@@ -464,6 +464,7 @@
 
     let driveAccessToken = null;
     let driveConnecting = false;
+    let driveReadyForFirstSave = false;
     let driveSyncing = false;
     let driveSyncQueued = false;
 
@@ -1153,6 +1154,7 @@
             }
             driveConnecting = false;
             driveAccessToken = response.access_token;
+            driveReadyForFirstSave = false;
             syncDrive('connect');
           },
           error_callback: fail
@@ -1274,11 +1276,20 @@
         const cloudChanged = Boolean(file && (!isSameFile || base.version !== file.version));
         const differentBackup = Boolean(file && base && !isSameFile);
 
+        const hasLocalData = records.length > 0 || defaultRate !== 40000;
+        if (file) driveReadyForFirstSave = false;
+        if (!file && action === 'connect' && !base && !hasLocalData) {
+          driveReadyForFirstSave = true;
+        }
+
         const canCreate = !file && (action === 'push' ||
-          (action === 'connect' && (records.length > 0 || defaultRate !== 40000)));
+          (action === 'connect' && hasLocalData) ||
+          (driveReadyForFirstSave && hasLocalData && (action === 'auto' || action === 'refresh')));
 
         if (!file && !canCreate) {
-          message = 'Chưa có dữ liệu trên Drive. Bấm Lưu lên Drive để tạo bản đầu tiên.';
+          message = driveReadyForFirstSave
+            ? 'Đã kết nối Drive. Ca đầu tiên sẽ tự lưu lên Drive.'
+            : 'Chưa có dữ liệu trên Drive. Bấm Lưu lên Drive để tạo bản đầu tiên.';
         } else if (file && action === 'pull' && local !== file.snapshot && (localChanged || differentBackup) &&
             !window.confirm('Tải bản Drive sẽ thay thế dữ liệu đang có trên trình duyệt này. Bạn đã sao lưu JSON và muốn tiếp tục?')) {
           message = 'Đã giữ dữ liệu trên máy. Bạn có thể xuất JSON trước khi tải lại từ Drive.';
@@ -1298,12 +1309,14 @@
         } else if (file && cloudChanged) {
           message = 'Dữ liệu trên máy và Drive khác nhau. Xuất JSON trên máy, rồi tải bản Drive và nhập gộp nếu cần.';
           tone = 'error';
-        } else if (canCreate && (action === 'connect' || base) &&
+        } else if (canCreate && (action === 'connect' || (action === 'push' && base && !driveReadyForFirstSave)) &&
             !window.confirm('Google Drive chưa có bản chấm công. Bạn muốn lưu dữ liệu trên máy lên Drive?')) {
           message = 'Dữ liệu vẫn đang lưu trên máy.';
         } else if (canCreate || localChanged || action === 'push') {
+          if (canCreate) driveReadyForFirstSave = true;
           const saved = await writeDriveBackup(file, local);
           rememberDriveBackup(saved, local);
+          driveReadyForFirstSave = false;
           message = `Đã lưu lên Drive lúc ${new Date().toLocaleTimeString('vi-VN')}.`;
           tone = 'synced';
         } else {

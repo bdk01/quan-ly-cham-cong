@@ -25,6 +25,6 @@
 5. Mở link đã deploy. Chọn **Cấu hình Drive**, dán Client ID rồi bấm **Lưu và kết nối Drive**. Chọn tài khoản Google và cấp quyền. Web sẽ kiểm tra bản JSON riêng của ứng dụng và tải dữ liệu về nếu trình duyệt chưa có dữ liệu.
 6. Nếu Drive chưa có bản chấm công và máy có dữ liệu, web sẽ hỏi có muốn lưu bản đầu tiên lên Drive. Dùng cùng Client ID và tài khoản Google trên các thiết bị còn lại để tải bản đó. Với dữ liệu từ bản HTML cũ hoặc một file JSON tải xuống từ Drive, dùng **Nhập JSON** trên thiết bị chứa bản chính trước khi lưu lên Drive.
 
-Web tự lưu thay đổi lên Drive khi phiên Google còn hiệu lực. Khi quay lại tab hoặc có mạng trở lại, web kiểm tra bản mới. Bạn có thể lấy dữ liệu ngay bằng **Tải từ Drive**. Sau khi tải lại trang hoặc khi phiên hết hạn, bấm **Kết nối Google Drive** để tiếp tục đồng bộ.
+Web tự lưu khi thêm, sửa hoặc xóa ca và phiên Google còn hiệu lực. Nếu vừa kết nối trên trình duyệt trống với tài khoản Drive chưa có dữ liệu, ca đầu tiên tự tạo file trên Drive. Mỗi tài khoản Google có dữ liệu riêng. Khi quay lại tab hoặc có mạng trở lại, web kiểm tra bản mới. Bạn có thể lấy dữ liệu ngay bằng **Tải từ Drive**. Sau khi tải lại trang hoặc khi phiên hết hạn, bấm **Kết nối Google Drive** để tiếp tục đồng bộ.
 
 Nếu cả bản trên máy và Drive đã thay đổi, web báo xung đột. Xuất JSON của bản trên máy trước khi tải bản Drive. Sau đó có thể nhập gộp để lấy lại các ca mới hoặc sửa lại các ca chồng nhau. Khi dùng nhiều máy, đợi báo đã lưu lên Drive rồi mới chuyển máy, vì kiểm tra phiên bản trước khi ghi vẫn có thể gặp hai lần ghi đồng thời.
