@@ -64,11 +64,6 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <button id="btnOpenDriveConfig" type="button"
-          class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer flex items-center gap-1.5">
-          <svg class="w-3.5 h-3.5 text-rose-500" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
-          Cấu hình Drive
-        </button>
         <button id="btnDriveConnect" type="button"
           class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-sm transition cursor-pointer">
           Kết nối Google Drive
@@ -81,29 +76,6 @@
           class="hidden px-3 py-1.5 rounded-lg border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition cursor-pointer">
           Refresh dữ liệu
         </button>
-      </div>
-    </div>
-
-    <!-- Collapsible Google Drive OAuth Client ID Config Panel -->
-    <div id="driveConfigPanel" class="hidden bg-slate-50 border-t border-slate-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div class="flex-1">
-          <label for="googleClientIdInput" class="block text-xs font-semibold text-slate-700 mb-1">
-            Google OAuth 2.0 Client ID (Scope: <code class="text-sky-700">drive.appdata</code>)
-          </label>
-          <input id="googleClientIdInput" type="text" placeholder="Ví dụ: 1234567890-abcdefg.apps.googleusercontent.com"
-            class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sky-500" />
-        </div>
-        <div class="flex items-center gap-2 self-end">
-          <button id="btnSaveClientId" type="button"
-            class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold cursor-pointer">
-            Lưu và kết nối Drive
-          </button>
-          <button id="btnCloseDriveConfig" type="button"
-            class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 text-xs font-medium cursor-pointer">
-            Đóng
-          </button>
-        </div>
       </div>
     </div>
   </section>
@@ -447,7 +419,7 @@
     const STORAGE_KEY = 'cham_cong_records_v2';
     const RATE_KEY = 'cham_cong_default_rate_v2';
     const BACKUP_META_KEY = 'cham_cong_last_backup_v2';
-    const DRIVE_CLIENT_ID_KEY = 'cham_cong_drive_client_id_v1';
+    const DRIVE_CLIENT_ID = '374651139995-ue42bctmgst4mueiqlcb09mu8ksb5c1a.apps.googleusercontent.com';
     const DRIVE_SESSION_KEY = 'cham_cong_drive_session_v1:' + location.pathname.replace(/[^/]*$/, '');
     const DRIVE_BASE_KEY = 'cham_cong_drive_base_v1';
     const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -566,9 +538,6 @@
       if (lastBackup) {
         document.getElementById('lastBackupBadge').textContent = `Sao lưu JSON: ${lastBackup}`;
       }
-
-      const savedClientId = localStorage.getItem(DRIVE_CLIENT_ID_KEY) || '';
-      document.getElementById('googleClientIdInput').value = savedClientId;
     }
 
     function saveLocalData(autoSyncCloud = true) {
@@ -1133,14 +1102,14 @@
         return;
       }
       if (!saved) return;
-      if (saved.clientId === localStorage.getItem(DRIVE_CLIENT_ID_KEY) &&
+      if (saved.clientId === DRIVE_CLIENT_ID &&
           typeof saved.token === 'string' && saved.token &&
           Number.isFinite(saved.expiresAt) && saved.expiresAt > Date.now()) {
         driveSession = saved;
         syncDrive('refresh');
       } else {
         setDriveSession(null);
-        updateDriveUI('Phiên Google đã hết hạn. Bấm Kết nối Google Drive để tiếp tục.');
+        updateDriveUI('Bấm Kết nối Google Drive để bắt đầu đồng bộ.');
       }
     }
 
@@ -1154,6 +1123,9 @@
       const colors = { pending: 'bg-amber-400', synced: 'bg-emerald-500', error: 'bg-rose-500' };
       document.getElementById('syncStatusDot').className = `w-2.5 h-2.5 rounded-full ${colors[tone]}`;
       document.getElementById('syncStatusText').textContent = message;
+      const connectButton = document.getElementById('btnDriveConnect');
+      connectButton.textContent = driveSession ? 'Đăng xuất Google Drive' : 'Kết nối Google Drive';
+      connectButton.disabled = driveSyncing || driveConnecting;
       for (const id of ['btnDriveSyncNow', 'btnDrivePullNow']) {
         const button = document.getElementById(id);
         button.classList.toggle('hidden', !driveSession);
@@ -1162,12 +1134,6 @@
     }
 
     function connectDriveOAuth() {
-      const clientId = localStorage.getItem(DRIVE_CLIENT_ID_KEY);
-      if (!clientId) {
-        document.getElementById('driveConfigPanel').classList.remove('hidden');
-        showToast('Hãy lưu Google OAuth Client ID để kết nối Drive.', 'warning');
-        return;
-      }
       const oauth = window.google?.accounts?.oauth2;
       if (!oauth) {
         showToast('Chưa tải được Google OAuth. Kiểm tra mạng rồi thử lại.', 'error');
@@ -1175,13 +1141,14 @@
       }
       if (driveSyncing || driveConnecting) return;
       driveConnecting = true;
+      updateDriveUI('Đang chờ bạn chọn tài khoản Google…');
       const fail = () => {
         driveConnecting = false;
-        showToast('Kết nối Google Drive chưa hoàn tất. Hãy thử lại.', 'error');
+        updateDriveUI('Kết nối Google Drive chưa hoàn tất. Bạn có thể thử lại.', 'error');
       };
       try {
         const client = oauth.initTokenClient({
-          client_id: clientId,
+          client_id: DRIVE_CLIENT_ID,
           scope: DRIVE_SCOPE,
           callback: (response) => {
             const expiresIn = Number(response.expires_in);
@@ -1192,7 +1159,7 @@
             }
             driveConnecting = false;
             setDriveSession({
-              clientId,
+              clientId: DRIVE_CLIENT_ID,
               token: response.access_token,
               expiresAt: Date.now() + expiresIn * 1000,
               readyForFirstSave: false
@@ -1201,7 +1168,7 @@
           },
           error_callback: fail
         });
-        client.requestAccessToken({ prompt: driveSession ? 'select_account' : '' });
+        client.requestAccessToken({ prompt: 'select_account' });
       } catch {
         fail();
       }
@@ -1621,29 +1588,16 @@
         document.getElementById('importModal').classList.add('hidden');
       });
 
-      // Google Drive configuration and sync
-      document.getElementById('btnOpenDriveConfig').addEventListener('click', () => {
-        document.getElementById('driveConfigPanel').classList.toggle('hidden');
-      });
-      document.getElementById('btnCloseDriveConfig').addEventListener('click', () => {
-        document.getElementById('driveConfigPanel').classList.add('hidden');
-      });
-      document.getElementById('btnSaveClientId').addEventListener('click', () => {
+      // Google Drive sign-in and sync
+      document.getElementById('btnDriveConnect').addEventListener('click', () => {
         if (driveSyncing || driveConnecting) return;
-        const clientId = document.getElementById('googleClientIdInput').value.trim();
-        if (!/^[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(clientId)) {
-          showToast('Client ID phải có đuôi .apps.googleusercontent.com.', 'error');
-          return;
-        }
-        if (clientId !== localStorage.getItem(DRIVE_CLIENT_ID_KEY)) {
+        if (driveSession) {
           setDriveSession(null);
-          localStorage.setItem(DRIVE_CLIENT_ID_KEY, clientId);
-          updateDriveUI('Đã lưu Client ID. Bấm Kết nối Google Drive.');
+          updateDriveUI('Đã đăng xuất Google Drive. Dữ liệu đang lưu trên trình duyệt.');
+        } else {
+          connectDriveOAuth();
         }
-        document.getElementById('driveConfigPanel').classList.add('hidden');
-        connectDriveOAuth();
       });
-      document.getElementById('btnDriveConnect').addEventListener('click', connectDriveOAuth);
       document.getElementById('btnDriveSyncNow').addEventListener('click', () => syncDrive('push'));
       document.getElementById('btnDrivePullNow').addEventListener('click', () => syncDrive('pull'));
       document.addEventListener('visibilitychange', () => {
